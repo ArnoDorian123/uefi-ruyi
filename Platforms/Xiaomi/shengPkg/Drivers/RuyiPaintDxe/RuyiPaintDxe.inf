@@ -1,0 +1,40 @@
+## @file
+#  Colour-band probe for the ruyi display bring-up.
+#
+#  Paints three bands straight into the buffer ABL is scanning out, without going through
+#  SimpleFbDxe (whose LocateMemoryRegionByName lookup is silent on failure). The result turns
+#  "is our code running" and "is 0xFC400000 the scanned-out buffer" into observable facts.
+#
+#  Remove this driver once a real display driver exists.
+#
+#  Copyright (c) 2026, UniXNU contributors. All rights reserved.
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+##
+[Defines]
+  INF_VERSION    = 0x00010005
+  BASE_NAME      = RuyiPaintDxe
+  FILE_GUID      = 1B7E5C2A-5F3D-4B9A-9C21-7D6E4F8A0B13
+  MODULE_TYPE    = DXE_DRIVER
+  VERSION_STRING = 1.0
+  ENTRY_POINT    = RuyiPaintEntry
+
+[Sources]
+  RuyiPaintDxe.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  SiliciumPkg/SiliciumPkg.dec
+
+[LibraryClasses]
+  DebugLib
+  PcdLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+
+[FixedPcd]
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight
+
+[Depex]
+  TRUE
