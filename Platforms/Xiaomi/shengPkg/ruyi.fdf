@@ -45,7 +45,7 @@ READ_LOCK_STATUS   = TRUE
 
   !include Include/APRIORI.inc
   !include Include/DXE.inc
-  !include Include/RAW.inc
+# !include Include/RAW.inc
 
   # RAM Manager reads the RAM partition table published by the vendor stack.
 !if $(SHENG_VENDOR_HW) == 1
