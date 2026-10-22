@@ -1,11 +1,5 @@
 ## @file
-#  Colour-band probe for the ruyi display bring-up.
-#
-#  Paints three bands straight into the buffer ABL is scanning out, without going through
-#  SimpleFbDxe (whose LocateMemoryRegionByName lookup is silent on failure). The result turns
-#  "is our code running" and "is 0xFC400000 the scanned-out buffer" into observable facts.
-#
-#  Remove this driver once a real display driver exists.
+#  Colour-band probe plus GOP presence marker for the ruyi display bring-up.
 #
 #  Copyright (c) 2026, UniXNU contributors. All rights reserved.
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
@@ -35,6 +29,9 @@
 [FixedPcd]
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid
 
 [Depex]
   TRUE
