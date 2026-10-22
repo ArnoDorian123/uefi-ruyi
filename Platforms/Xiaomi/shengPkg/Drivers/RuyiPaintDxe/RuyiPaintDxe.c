@@ -1,10 +1,17 @@
 /** @file
   Colour-band probe for the ruyi display bring-up.
 
-  Writes three horizontal bands into the physical buffer the ABL splash lives in, then returns.
-  Nothing here depends on the UEFI memory map, on a GOP, or on a device tree name lookup, so the
-  colours appearing on screen is proof that firmware code ran and that the address is the one
-  being scanned out.
+  Writes a handful of horizontal bands into the physical buffer the ABL splash lives in, then
+  returns. Nothing here depends on the UEFI memory map, on a GOP, or on a device tree name
+  lookup, so colours appearing on screen is proof that firmware code ran and that the address
+  is the one being scanned out.
+
+  Only the first rows are painted on purpose: the reserved region is declared as 45 MiB, but
+  the firmware page tables are not guaranteed to map all of it. Staying inside a couple of
+  megabytes removes the "write into an unmapped page" failure mode, which would otherwise be
+  indistinguishable from "wrong address".
+
+  Remove this driver once a real display driver exists.
 
   Copyright (c) 2026, UniXNU contributors. All rights reserved.
   SPDX-License-Identifier: BSD-2-Clause-Patent
@@ -21,6 +28,11 @@
 //
 #define RUYI_FB_BASE  0xFC400000ULL
 
+//
+// Upper bound on painted rows: 320 rows at 1224 pixels and 32 bpp is about 1.5 MiB.
+//
+#define RUYI_PAINT_MAX_ROWS  320
+
 EFI_STATUS
 EFIAPI
 RuyiPaintEntry (
@@ -31,6 +43,7 @@ RuyiPaintEntry (
   UINT32  Width  = FixedPcdGet32 (PcdFrameBufferWidth);
   UINT32  Height = FixedPcdGet32 (PcdFrameBufferHeight);
   UINT32  *Fb    = (UINT32 *)(UINTN)RUYI_FB_BASE;
+  UINT32  Rows;
   UINT32  X;
   UINT32  Y;
 
@@ -39,12 +52,17 @@ RuyiPaintEntry (
     return EFI_SUCCESS;
   }
 
-  for (Y = 0; Y < Height; Y++) {
+  Rows = Height / 8;
+  if (Rows > RUYI_PAINT_MAX_ROWS) {
+    Rows = RUYI_PAINT_MAX_ROWS;
+  }
+
+  for (Y = 0; Y < Rows; Y++) {
     UINT32  Colour;
 
-    if (Y < Height / 3) {
+    if (Y < Rows / 3) {
       Colour = 0x000000FFU;   // red   (BGRX)
-    } else if (Y < (2 * Height) / 3) {
+    } else if (Y < (2 * Rows) / 3) {
       Colour = 0x0000FF00U;   // green
     } else {
       Colour = 0x00FF0000U;   // blue
@@ -55,6 +73,14 @@ RuyiPaintEntry (
     }
   }
 
-  DEBUG ((EFI_D_ERROR, "RuyiPaintDxe: painted %ux%u at 0x%lx\n", Width, Height, RUYI_FB_BASE));
+  DEBUG ((
+    EFI_D_ERROR,
+    "RuyiPaintDxe: painted %u rows of %ux%u at 0x%lx\n",
+    Rows,
+    Width,
+    Height,
+    RUYI_FB_BASE
+    ));
+
   return EFI_SUCCESS;
 }
