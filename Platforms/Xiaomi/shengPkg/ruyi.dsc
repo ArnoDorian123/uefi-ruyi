@@ -1,14 +1,18 @@
 ##
 #  ruyi (Xiaomi MIX Flip, SM8650 / Lanai) platform description.
 #
-#  Derived from UniXNU/uefi-sheng Platform/Xiaomi/shengPkg/sheng.dsc.
-#  Differences from sheng:
-#    - SoC include is LanaiPkg (SM8650) instead of KailuaPkg (SM8550)
-#    - package name, output directory and SMBIOS strings
-#    - frame buffer geometry is the ruyi primary panel (1224 x 2912)
+#  This file lives in Platforms/Xiaomi/shengPkg on purpose: the Include/*.inc files of that
+#  package hardcode shengPkg/... INF paths, so keeping the directory name avoids rewriting
+#  them. Only the platform identity below differs from sheng.dsc.
 #
-#  The Drivers/ tree is copied verbatim from shengPkg, so the INF paths below still use the
-#  Sheng* directory names. Do not sed them.
+#  Required base: a fork of UniXNU/uefi-sheng (branch sheng). The Binaries submodule of that
+#  tree provides Binaries/sheng, which the included FDF fragments reference.
+#
+#  Copyright (c) 2011 - 2022, ARM Limited. All rights reserved.
+#  Copyright (c) 2014, Linaro Limited. All rights reserved.
+#  Copyright (c) 2015 - 2020, Intel Corporation. All rights reserved.
+#  Copyright (c) 2018, Bingxing Wang. All rights reserved.
+#  Copyright (c) Microsoft Corporation.
 #
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
 ##
@@ -22,27 +26,27 @@
   SUPPORTED_ARCHITECTURES        = AARCH64
   BUILD_TARGETS                  = RELEASE|DEBUG
   SKUID_IDENTIFIER               = DEFAULT
-  FLASH_DEFINITION               = ruyiPkg/ruyi.fdf
+  FLASH_DEFINITION               = shengPkg/ruyi.fdf
   USE_CUSTOM_DISPLAY_DRIVER      = 0
 
   #
   # 0 = Mu drivers only. ABL keeps scanning the splash buffer out, so the boot manager is
   #     visible without any vendor hardware driver. This is the M1 configuration.
   # 1 = also load the stock vendor hardware drivers (SMEM, clocks, RPMh, UFS, USB, charger).
-  #     Their initialization currently blanks the panel on sheng; not attempted for ruyi yet.
   #
-  RUYI_VENDOR_HW                 = 0
+  # The name is kept as SHENG_VENDOR_HW because the inherited Include/*.inc files test it.
+  #
+  SHENG_VENDOR_HW                = 0
 
   #
-  # SM8650 variant selector. 0 = SM8650-AB (ruyi). Confirm against LanaiPkg before enabling
-  # anything that depends on the -AC binning.
+  # SM8650 variant selector. 0 = SM8650-AB (ruyi).
   #
   SOC_TYPE                       = 0
 
 !include LanaiPkg/LanaiPkg.dsc.inc
 
-!if ($(USE_CUSTOM_DISPLAY_DRIVER) == 1) && ($(RUYI_VENDOR_HW) == 0)
-  !error The stock DisplayDxe chain needs RUYI_VENDOR_HW = 1
+!if ($(USE_CUSTOM_DISPLAY_DRIVER) == 1) && ($(SHENG_VENDOR_HW) == 0)
+  !error The stock DisplayDxe chain needs SHENG_VENDOR_HW = 1
 !endif
 
 [PcdsFixedAtBuild]
@@ -70,24 +74,19 @@
   # Simple Frame Buffer
   #
   # The ruyi primary (inner) panel is 1224 x 2912. ABL splash geometry for this board is not
-  # recorded anywhere yet; if the debug log does not appear, try the secondary panel
-  # (1392 x 1208) or scale the values by 4 (the sheng values are the panel XML actives).
+  # recorded yet; if the debug log does not appear, try the secondary panel (1392 x 1208).
   #
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth|1224
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight|2912
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferColorDepth|32
-  # PcdFrameBufferFontScale and PcdFrameBufferDelay are declared only by the Silicium tree
-  # that ships with uefi-sheng. The Mu-Silicium upstream DEC does not declare them, and EDK II
-  # rejects a DSC PCD that no DEC in the FDF dependency chain declares (error F001). Both are
-  # debug-log cosmetics, so they stay out until the base switches to uefi-sheng.
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferFontScale|3
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferDelay|30000
 
   #
   # Platform PEI
   #
   gQcomPkgTokenSpaceGuid.PcdPlatformType|"LA"
-!if $(RUYI_VENDOR_HW) == 0
-  # PlatformPeim otherwise scans the stock UEFI's leftover FD window and calls into its
-  # scheduler protocol; with no vendor drivers nothing consumes those HOBs.
+!if $(SHENG_VENDOR_HW) == 0
   gQcomPkgTokenSpaceGuid.PcdBuildXblHobs|FALSE
 !endif
 
@@ -95,12 +94,12 @@
   #
   # Memory Libraries
   #
-  MemoryMapLib|ruyiPkg/Library/MemoryMapLib/MemoryMapLib.inf
+  MemoryMapLib|shengPkg/Library/MemoryMapLib/MemoryMapLib.inf
 
   #
   # QCOM Libraries
   #
-  ConfigurationMapLib|ruyiPkg/Library/ConfigurationMapLib/ConfigurationMapLib.inf
+  ConfigurationMapLib|shengPkg/Library/ConfigurationMapLib/ConfigurationMapLib.inf
 
 [Components]
   #
@@ -108,10 +107,10 @@
   #
   UniXNUPkg/Application/UniXNU/UniXNU.inf
   UniXNUPkg/Driver/UniXNUDxe/UniXNUDxe.inf
-  ruyiPkg/Drivers/ShengDisplayDepexDxe/ShengDisplayDepexDxe.inf
-  ruyiPkg/Drivers/ShengGopLogDxe/ShengGopLogDxe.inf
-  ruyiPkg/Drivers/ShengBootMemoryDxe/ShengBootMemoryDxe.inf
-  ruyiPkg/Drivers/ShengKeyInputDxe/ShengKeyInputDxe.inf
+  shengPkg/Drivers/ShengDisplayDepexDxe/ShengDisplayDepexDxe.inf
+  shengPkg/Drivers/ShengGopLogDxe/ShengGopLogDxe.inf
+  shengPkg/Drivers/ShengBootMemoryDxe/ShengBootMemoryDxe.inf
+  shengPkg/Drivers/ShengKeyInputDxe/ShengKeyInputDxe.inf
   DarwinBootPkg/Driver/DarwinBoot.inf
 
 [LibraryClasses]
