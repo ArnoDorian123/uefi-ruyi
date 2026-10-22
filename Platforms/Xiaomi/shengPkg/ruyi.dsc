@@ -111,6 +111,7 @@
   shengPkg/Drivers/ShengGopLogDxe/ShengGopLogDxe.inf
   shengPkg/Drivers/ShengBootMemoryDxe/ShengBootMemoryDxe.inf
   shengPkg/Drivers/ShengKeyInputDxe/ShengKeyInputDxe.inf
+  shengPkg/Drivers/RuyiPaintDxe/RuyiPaintDxe.inf
   DarwinBootPkg/Driver/DarwinBoot.inf
 
 [LibraryClasses]
