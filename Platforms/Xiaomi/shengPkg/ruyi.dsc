@@ -76,8 +76,8 @@
   # The ruyi primary (inner) panel is 1224 x 2912. ABL splash geometry for this board is not
   # recorded yet; if the debug log does not appear, try the secondary panel (1392 x 1208).
   #
-  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth|1224
-  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight|2912
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth|1392
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight|1208
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferColorDepth|32
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferFontScale|3
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferDelay|30000
