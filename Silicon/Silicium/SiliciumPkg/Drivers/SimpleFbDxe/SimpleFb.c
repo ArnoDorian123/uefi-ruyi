@@ -93,6 +93,13 @@ GetFrameBufferInfos (
 {
   EFI_MEMORY_REGION_DESCRIPTOR FrameBufferRegion;
 
+  //
+  // ruyi: the descriptor is a stack variable and LocateMemoryRegionByName is not required to
+  // zero it on failure. Without this the "Address == 0" test below can read stack garbage and
+  // the fallback would be skipped, pointing the GOP at an arbitrary address.
+  //
+  ZeroMem (&FrameBufferRegion, sizeof (FrameBufferRegion));
+
   // Locate "Display Reserved" Memory Region
   LocateMemoryRegionByName ("Display Reserved", &FrameBufferRegion);
   LocateMemoryRegionByName ("Display_Reserved", &FrameBufferRegion);
@@ -298,7 +305,7 @@ RegisterFrameBuffer (
   }
 
   // Register GOP Protocol
-  Status = gBS->InstallMultipleProtocolInterfaces (&ImageHandle, &gEfiDevicePathProtocolGuid, &DisplayDevicePath, &gEfiGraphicsOutputProtocolGuid, &mFrameBuffer, NULL);
+  Status = gBS->InstallMultipleProtocolInterfaces (&ImageHandle, &gEfiDevicePathProtocolGuid, &gEfiGraphicsOutputProtocolGuid, &mFrameBuffer, NULL);
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "Failed to Register GOP Protocol!\n"));
     ASSERT_EFI_ERROR (Status);
