@@ -100,7 +100,15 @@ GetFrameBufferInfos (
   // Verify Frame Buffer Region
   if (!FrameBufferRegion.Address) {
     DEBUG ((EFI_D_ERROR, "Failed to Locate \"Display Reserved\" Memory Region!\n"));
-    return EFI_NOT_FOUND;
+    //
+    // ruyi: the board device tree declares /reserved-memory/splash_region at 0xFC400000
+    // (45 MiB) and that is the buffer the ABL leaves scanning out, but the region does not
+    // reach the memory-region table this lookup reads. Fall back to the known address so a
+    // GOP is installed and the console has somewhere to draw.
+    //
+    // Verified on hardware: painting 0xFC400000 directly puts pixels on the inner panel.
+    //
+    FrameBufferRegion.Address = 0xFC400000ULL;
   }
 
   // Get Frame Buffer Details
