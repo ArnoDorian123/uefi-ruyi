@@ -45,7 +45,10 @@ READ_LOCK_STATUS   = TRUE
 
   !include Include/APRIORI.inc
   !include Include/DXE.inc
-# !include Include/RAW.inc
+  # RAW.inc carries an unconditional FILE FREEFORM from Binaries/sheng/RawFiles, which does not
+  # exist in this repository. Its only other content (panel XMLs) is gated on
+  # USE_CUSTOM_DISPLAY_DRIVER = 1, so dropping the include costs only SecParti.cfg.
+#  !include Include/RAW.inc
 
   # RAM Manager reads the RAM partition table published by the vendor stack.
 !if $(SHENG_VENDOR_HW) == 1
@@ -62,6 +65,9 @@ READ_LOCK_STATUS   = TRUE
 
   # IORT DT
   INF QcomPkg/Drivers/IortDtDxe/IortDtDxe.inf
+
+  # Colour-band probe: writes straight into the ABL splash buffer, no GOP, no name lookup.
+  INF shengPkg/Drivers/RuyiPaintDxe/RuyiPaintDxe.inf
 
   # Device Tree
   # The merged ruyi DTB is passed to BootShim by `unixnu bootimg --dtb`, so it is not embedded
