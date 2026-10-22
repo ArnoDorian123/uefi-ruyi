@@ -77,7 +77,7 @@
   # recorded yet; if the debug log does not appear, try the secondary panel (1392 x 1208).
   #
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth|1224
-  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight|2912
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight|400
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferColorDepth|32
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferFontScale|3
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferDelay|30000
