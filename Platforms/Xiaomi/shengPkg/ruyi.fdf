@@ -1,24 +1,20 @@
 ##
-#  ruyi (Xiaomi MIX Flip, SM8650 / Lanai) flash device description.
+#  ruyi flash device description.
 #
-#  Self-contained on purpose: it does NOT include shengPkg's Include/APRIORI.inc,
-#  Include/DXE.inc or Include/RAW.inc. Those files list the sheng vendor binaries
-#  (INF Binaries/sheng/QcomPkg/...) which do not exist in this repository, and the ruyi
-#  M1a image runs with RUYI_VENDOR_HW = 0, so none of them is wanted yet.
+#  Identical to sheng.fdf: the FV layout and the Include/*.inc fragments are the ones the
+#  UniXNU boot manager and DarwinBoot already expect. Only the file name changed, so the
+#  package prefix inside the includes (shengPkg/...) keeps resolving.
 #
-#  The module list below is the sheng DXE set with every vendor entry removed: Mu core,
-#  ACPI/DT plumbing, UniXNU, DarwinBoot, block/FAT, console, GOP from the bytes the
-#  previous stage already scans out, USB keyboard and storage.
-#
+#  Copyright (c) 2018, Linaro Limited. All rights reserved.
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
 ##
 
 [FD.SILICIUM_UEFI]
-BaseAddress   = $(FD_BASE)|gArmTokenSpaceGuid.PcdFdBaseAddress
-Size          = $(FD_SIZE)|gArmTokenSpaceGuid.PcdFdSize
+BaseAddress   = $(FD_BASE)|gArmTokenSpaceGuid.PcdFdBaseAddress # The base address of the FLASH Device.
+Size          = $(FD_SIZE)|gArmTokenSpaceGuid.PcdFdSize        # The size in bytes of the FLASH Device
 ErasePolarity = 1
 
-# BlockSize * NumBlocks = Size
+# This one is tricky, it must be: BlockSize * NumBlocks = Size
 BlockSize     = 0x1000
 NumBlocks     = $(FD_BLOCKS)
 
@@ -30,7 +26,7 @@ FV = FVMAIN_COMPACT
 FvNameGuid         = 3A1F6C42-58D9-4B7E-9E10-2C7A4D8B5F31
 BlockSize          = 0x1000
 NumBlocks          = 0        # This FV gets compressed so make it just big enough
-FvAlignment        = 8
+FvAlignment        = 8        # FV alignment and FV attributes setting.
 ERASE_POLARITY     = 1
 MEMORY_MAPPED      = TRUE
 STICKY_WRITE       = TRUE
@@ -47,61 +43,36 @@ READ_STATUS        = TRUE
 READ_LOCK_CAP      = TRUE
 READ_LOCK_STATUS   = TRUE
 
-  # --- Mu DXE core and runtime ------------------------------------------------
-  INF MdeModulePkg/Core/Dxe/DxeMain.inf
-  INF MdeModulePkg/Universal/PCD/Dxe/Pcd.inf
-  INF MdeModulePkg/Universal/ReportStatusCodeRouter/RuntimeDxe/ReportStatusCodeRouterRuntimeDxe.inf
-  INF MdeModulePkg/Universal/StatusCodeHandler/RuntimeDxe/StatusCodeHandlerRuntimeDxe.inf
-  INF ArmPkg/Drivers/CpuDxe/CpuDxe.inf
-  INF MdeModulePkg/Core/RuntimeDxe/RuntimeDxe.inf
-  INF MdeModulePkg/Universal/SecurityStubDxe/SecurityStubDxe.inf
-  INF MdeModulePkg/Universal/WatchdogTimerDxe/WatchdogTimer.inf
-  INF MdeModulePkg/Universal/CapsuleRuntimeDxe/CapsuleRuntimeDxe.inf
-  INF MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
-  INF EmbeddedPkg/EmbeddedMonotonicCounter/EmbeddedMonotonicCounter.inf
-  INF MdeModulePkg/Universal/ResetSystemRuntimeDxe/ResetSystemRuntimeDxe.inf
-  INF EmbeddedPkg/RealTimeClockRuntimeDxe/RealTimeClockRuntimeDxe.inf
-  INF EmbeddedPkg/MetronomeDxe/MetronomeDxe.inf
-  INF MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
-  INF ArmPkg/Drivers/ArmGicDxe/ArmGicDxe.inf
-  INF ArmPkg/Drivers/TimerDxe/TimerDxe.inf
+  !include Include/APRIORI.inc
+  !include Include/DXE.inc
+  !include Include/RAW.inc
 
-  # --- Platform plumbing ------------------------------------------------------
-  INF MdeModulePkg/Universal/DevicePathDxe/DevicePathDxe.inf
+  # RAM Manager reads the RAM partition table published by the vendor stack.
+!if $(SHENG_VENDOR_HW) == 1
+  INF SiliciumPkg/Drivers/RamManagerDxe/RamManagerDxe.inf
+!endif
+
+  # SmBios
   INF MdeModulePkg/Universal/SmbiosDxe/SmbiosDxe.inf
   INF SiliciumPkg/Drivers/SmBiosTableDxe/SmBiosTableDxe.inf
-  INF QcomPkg/Drivers/IortDtDxe/IortDtDxe.inf
-  INF ruyiPkg/Drivers/ShengBootMemoryDxe/ShengBootMemoryDxe.inf
 
-  # --- UniXNU and the XNU loader ---------------------------------------------
-  # DarwinBoot lives in the firmware: an image loaded from a volume is refused by the
-  # image verification of this build.
+  # UniXNU
   INF UniXNUPkg/Application/UniXNU/UniXNU.inf
   INF UniXNUPkg/Driver/UniXNUDxe/UniXNUDxe.inf
-  INF DarwinBootPkg/Driver/DarwinBoot.inf
 
-  # --- Block I/O, partitions, file system ------------------------------------
-  INF MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
-  INF MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
-  INF FatPkg/EnhancedFatDxe/Fat.inf
-  INF MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
+  # IORT DT
+  INF QcomPkg/Drivers/IortDtDxe/IortDtDxe.inf
 
-  # --- Console and boot manager ----------------------------------------------
-  INF MdeModulePkg/Universal/BdsDxe/BdsDxe.inf
-  INF EmbeddedPkg/SimpleTextInOutSerial/SimpleTextInOutSerial.inf
-  INF MdeModulePkg/Universal/PrintDxe/PrintDxe.inf
-  INF MdeModulePkg/Universal/Console/ConPlatformDxe/ConPlatformDxe.inf
-  INF MdeModulePkg/Universal/Console/ConSplitterDxe/ConSplitterDxe.inf
-  INF ruyiPkg/Drivers/ShengKeyInputDxe/ShengKeyInputDxe.inf
-  INF MdeModulePkg/Universal/Console/GraphicsConsoleDxe/GraphicsConsoleDxe.inf
+  # Device Tree
+  # The merged ruyi DTB is passed to BootShim by `unixnu bootimg --dtb`, so it is not embedded
+  # here. Enable this only if the boot flow has to carry the DTB inside the firmware volume.
+  #INF EmbeddedPkg/Drivers/DtPlatformDxe/DtPlatformDxe.inf
+  #FILE FREEFORM = 25462CDA-221F-47DF-AC1D-259CFAA4E326 {
+  #  SECTION RAW = shengPkg/FdtBlob/lanai-qualcomm-ruyi.dtb
+  #  SECTION UI = "DeviceTreeBlob"
+  #}
 
-  # GOP on the frame buffer the previous stage left scanning out. No panel init.
-  INF SiliciumPkg/Drivers/SimpleFbDxe/SimpleFbDxe.inf
-
-  # --- USB keyboard and mass storage -----------------------------------------
-  INF MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
-  INF MdeModulePkg/Bus/Usb/UsbKbDxe/UsbKbDxe.inf
-  INF MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
+  !include QcomPkg/Extra.fdf.inc
 
 [FV.FVMAIN_COMPACT]
 FvAlignment        = 8
