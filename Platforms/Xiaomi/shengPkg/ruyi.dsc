@@ -78,7 +78,7 @@
   #
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth|1224
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight|2912
-  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferColorDepth|30
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferColorDepth|32
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferFontScale|3
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferDelay|30000
 
