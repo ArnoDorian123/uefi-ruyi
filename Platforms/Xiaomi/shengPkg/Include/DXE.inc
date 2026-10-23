@@ -95,7 +95,7 @@
   INF shengPkg/Drivers/ShengDisplayDepexDxe/ShengDisplayDepexDxe.inf
   INF Binaries/sheng/QcomPkg/Drivers/DisplayDxe/DisplayDxe.inf
 !else
-  INF SiliciumPkg/Drivers/SimpleFbDxe/SimpleFbDxe.inf
+#  INF SiliciumPkg/Drivers/SimpleFbDxe/SimpleFbDxe.inf
 !endif
 
   # Headless until stock sheng framebuffer data is available.
