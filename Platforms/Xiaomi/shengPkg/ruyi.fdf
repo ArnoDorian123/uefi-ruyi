@@ -68,6 +68,7 @@ READ_LOCK_STATUS   = TRUE
 
   # Colour-band probe: writes straight into the ABL splash buffer, no GOP, no name lookup.
   INF shengPkg/Drivers/RuyiPaintDxe/RuyiPaintDxe.inf
+  INF shengPkg/Drivers/RuyiGopDxe/RuyiGopDxe.inf
 
   # Device Tree
   # The merged ruyi DTB is passed to BootShim by `unixnu bootimg --dtb`, so it is not embedded
