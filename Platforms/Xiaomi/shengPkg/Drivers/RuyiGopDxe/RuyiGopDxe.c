@@ -2,8 +2,8 @@
   Minimal GOP on the frame buffer the ABL leaves scanning out.
 
   Only the operations GraphicsConsole actually issues are implemented: video fill, buffer to
-  video, video to buffer and video to video. Everything is a plain pixel loop, so there is no
-  library state that can spin.
+  video, video to buffer and video to video. Everything is a plain pixel/CopyMem loop, so there
+  is no library state that can spin.
 
   Copyright (c) 2026, UniXNU contributors. All rights reserved.
   SPDX-License-Identifier: BSD-2-Clause-Patent
@@ -101,7 +101,6 @@ GopBlt (
   UINT32  *Fb    = FrameBuffer ();
   UINTN   Pitch  = mModeInfo.PixelsPerScanLine;
   UINTN   SrcDelta;
-  UINTN   DstDelta;
   UINTN   X;
   UINTN   Y;
 
@@ -118,7 +117,6 @@ GopBlt (
   }
 
   SrcDelta = (Delta == 0) ? Width * sizeof (UINT32) : Delta;
-  DstDelta = Pitch * sizeof (UINT32);
 
   switch (BltOperation) {
     case EfiBltVideoFill:
