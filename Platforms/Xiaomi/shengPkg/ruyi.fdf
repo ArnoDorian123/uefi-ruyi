@@ -67,7 +67,7 @@ READ_LOCK_STATUS   = TRUE
   INF QcomPkg/Drivers/IortDtDxe/IortDtDxe.inf
 
   # Colour-band probe: writes straight into the ABL splash buffer, no GOP, no name lookup.
-  INF shengPkg/Drivers/RuyiPaintDxe/RuyiPaintDxe.inf
+  # INF shengPkg/Drivers/RuyiPaintDxe/RuyiPaintDxe.inf
   INF shengPkg/Drivers/RuyiGopDxe/RuyiGopDxe.inf
 
   # Device Tree
