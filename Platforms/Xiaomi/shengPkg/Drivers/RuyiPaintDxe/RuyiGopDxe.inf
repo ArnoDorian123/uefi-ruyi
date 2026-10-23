@@ -1,0 +1,40 @@
+## @file
+#  Minimal graphics output protocol on the ABL frame buffer.
+#
+#  Replaces Silicium's SimpleFbDxe, whose FrameBufferBltLib path hangs on this geometry while
+#  holding TPL_NOTIFY. This driver implements Blt directly, so nothing can spin.
+##
+[Defines]
+  INF_VERSION    = 0x00010005
+  BASE_NAME      = RuyiGopDxe
+  FILE_GUID      = 5C2A9E14-7B31-4D68-8F02-3A6E1D9B4C77
+  MODULE_TYPE    = DXE_DRIVER
+  VERSION_STRING = 1.0
+  ENTRY_POINT    = RuyiGopEntry
+
+[Sources]
+  RuyiGopDxe.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  SiliciumPkg/SiliciumPkg.dec
+
+[LibraryClasses]
+  BaseMemoryLib
+  DebugLib
+  MemoryAllocationLib
+  PcdLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+
+[FixedPcd]
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid
+  gEfiDevicePathProtocolGuid
+
+[Depex]
+  TRUE
