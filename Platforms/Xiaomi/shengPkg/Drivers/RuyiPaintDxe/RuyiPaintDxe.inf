@@ -1,5 +1,8 @@
 ## @file
-#  Colour-band probe plus GOP presence marker for the ruyi display bring-up.
+#  Liveness probe for the ruyi display bring-up.
+#
+#  Arms a one second timer that repaints a moving block, so the question "is the firmware still
+#  alive" can be answered on a screen that has no text output.
 #
 #  Copyright (c) 2026, UniXNU contributors. All rights reserved.
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
@@ -29,9 +32,6 @@
 [FixedPcd]
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight
-
-[Protocols]
-  gEfiGraphicsOutputProtocolGuid
 
 [Depex]
   TRUE
