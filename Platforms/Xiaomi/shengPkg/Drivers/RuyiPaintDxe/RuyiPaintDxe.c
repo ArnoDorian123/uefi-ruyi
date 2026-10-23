@@ -1,13 +1,12 @@
 /** @file
-  Liveness probe for the ruyi display bring-up.
+  Synchronous display probe for the ruyi display bring-up.
 
-  Arms a one second periodic timer whose callback paints a magenta block that moves down the
-  screen. The boot manager clears the screen once when it binds the graphics output protocol,
-  so a single paint would be wiped; a periodic repaint survives that and answers a question no
-  static probe can: "is the firmware still alive and are timers still firing".
+  Paints a magenta block that walks down the screen using gBS->Stall() between steps, then
+  returns. Nothing here depends on the timer API, on a GOP, or on the console: it only writes
+  into the physical buffer the ABL left scanning out, at /reserved-memory/splash_region.
 
-  If the block keeps moving, the platform is healthy and the missing piece is text output.
-  If it stops, execution is blocked somewhere after this driver returned.
+  Five seconds of visible motion prove three things at once: the driver executes, the frame
+  buffer address is the scanned-out one, and the firmware is alive at DXE dispatch time.
 
   Remove this driver once a real display driver exists.
 
@@ -27,12 +26,10 @@
 #define RUYI_FB_BASE  0xFC400000ULL
 
 //
-// Height of the moving block in pixels.
+// Block height in pixels and number of animation steps.
 //
-#define RUYI_BLOCK_ROWS  40
-
-STATIC EFI_EVENT  mTimerEvent = NULL;
-STATIC UINT32     mTick       = 0;
+#define RUYI_BLOCK_ROWS  60
+#define RUYI_STEPS       10
 
 STATIC
 VOID
@@ -52,21 +49,6 @@ PaintBlock (
   }
 }
 
-STATIC
-VOID
-EFIAPI
-Tick (
-  IN EFI_EVENT  Event,
-  IN VOID       *Context
-  )
-{
-  UINT32  Height = FixedPcdGet32 (PcdFrameBufferHeight);
-  UINT32  Span   = (Height > 2 * RUYI_BLOCK_ROWS) ? (Height - 2 * RUYI_BLOCK_ROWS) : 1;
-
-  PaintBlock ((mTick * RUYI_BLOCK_ROWS) % Span);
-  mTick++;
-}
-
 EFI_STATUS
 EFIAPI
 RuyiPaintEntry (
@@ -74,28 +56,25 @@ RuyiPaintEntry (
   IN EFI_SYSTEM_TABLE  *SystemTable
   )
 {
-  EFI_STATUS  Status;
+  UINT32  Width  = FixedPcdGet32 (PcdFrameBufferWidth);
+  UINT32  Height = FixedPcdGet32 (PcdFrameBufferHeight);
+  UINT32  Step;
+  UINT32  Span;
 
-  if ((FixedPcdGet32 (PcdFrameBufferWidth) == 0) || (FixedPcdGet32 (PcdFrameBufferHeight) == 0)) {
-    DEBUG ((EFI_D_ERROR, "RuyiPaintDxe: frame buffer geometry is zero\n"));
+  DEBUG ((EFI_D_ERROR, "RuyiPaintDxe: entry %ux%u at 0x%lx\n", Width, Height, RUYI_FB_BASE));
+
+  if ((Width == 0) || (Height == 0) || (Width > 4096) || (Height > 4096)) {
+    DEBUG ((EFI_D_ERROR, "RuyiPaintDxe: bad geometry\n"));
     return EFI_SUCCESS;
   }
 
-  Status = gBS->CreateEvent (EVT_TIMER, TPL_CALLBACK, Tick, NULL, &mTimerEvent);
-  if (EFI_ERROR (Status)) {
-    DEBUG ((EFI_D_ERROR, "RuyiPaintDxe: CreateEvent failed %r\n", Status));
-    return EFI_SUCCESS;
+  Span = (Height > 2 * RUYI_BLOCK_ROWS) ? (Height - 2 * RUYI_BLOCK_ROWS) : 1;
+
+  for (Step = 0; Step < RUYI_STEPS; Step++) {
+    PaintBlock ((Step * Span) / RUYI_STEPS);
+    gBS->Stall (500000);   // 500 ms per step, 10 steps = 5 s
   }
 
-  //
-  // 10 000 000 * 100 ns = 1 s.
-  //
-  Status = gBS->SetTimer (mTimerEvent, TimerPeriodic, 10000000);
-  if (EFI_ERROR (Status)) {
-    DEBUG ((EFI_D_ERROR, "RuyiPaintDxe: SetTimer failed %r\n", Status));
-    return EFI_SUCCESS;
-  }
-
-  DEBUG ((EFI_D_ERROR, "RuyiPaintDxe: 1 Hz liveness timer armed\n"));
+  DEBUG ((EFI_D_ERROR, "RuyiPaintDxe: walked %u steps\n", RUYI_STEPS));
   return EFI_SUCCESS;
 }
