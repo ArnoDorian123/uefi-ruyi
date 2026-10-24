@@ -1,20 +1,6 @@
 /** @file
-  Minimal GOP on the frame buffer the ABL leaves scanning out.
-
-  Only the operations GraphicsConsole actually issues are implemented: video fill, buffer to
-  video, video to buffer and video to video. Everything is a plain pixel/CopyMem loop, so there
-  is no library state that can spin.
-
-  The frame buffer is reserved RAM mapped as normal cacheable memory, so every write is followed
-  by a cache write-back for the touched rows. Without it the first render of a screen appears as
-  scattered dots and only becomes correct once the cache drains by itself.
-
-  A one second heartbeat near the top-left corner tells a hung boot manager apart from a kernel
-  that died without printing anything.
-
-  On load it paints a dark background plus one 100x100 square in each corner and then installs
-  the protocol. Four squares exactly in the corners prove the frame buffer geometry is right;
-  any displacement tells how far off the declared width or height is.
+  Minimal GOP on the frame buffer the ABL leaves scanning out, plus a status strip that reports
+  whether the timer services work at all.
 
   Copyright (c) 2026, UniXNU contributors. All rights reserved.
   SPDX-License-Identifier: BSD-2-Clause-Patent
@@ -31,6 +17,10 @@
 #include <Protocol/GraphicsOutput.h>
 
 #define RUYI_FB_BASE  0xFC400000ULL
+
+#define RED    0x000000FFU
+#define GREEN  0x0000FF00U
+#define BLACK  0x00000000U
 
 #pragma pack(1)
 typedef struct {
@@ -63,12 +53,6 @@ FrameBuffer (
   return (UINT32 *)(UINTN)RUYI_FB_BASE;
 }
 
-/**
-  Write back the given rows so the display engine sees them.
-
-  @param[in]  FirstRow  First row that was written.
-  @param[in]  RowCount  Number of rows that were written.
-**/
 STATIC
 VOID
 FlushRows (
@@ -89,6 +73,30 @@ FlushRows (
   }
 
   WriteBackDataCacheRange ((VOID *)(UINTN)(RUYI_FB_BASE + Offset), Length);
+}
+
+/**
+  Paint a 64x64 block at the given column, on row 100.
+**/
+STATIC
+VOID
+PaintStatusBlock (
+  IN UINTN   Column,
+  IN UINT32  Colour
+  )
+{
+  UINT32  *Fb   = FrameBuffer ();
+  UINTN   Pitch = mModeInfo.PixelsPerScanLine;
+  UINTN   X;
+  UINTN   Y;
+
+  for (Y = 0; Y < 64; Y++) {
+    for (X = 0; X < 64; X++) {
+      Fb[(100 + Y) * Pitch + Column + X] = Colour;
+    }
+  }
+
+  FlushRows (100, 64);
 }
 
 STATIC
@@ -194,10 +202,6 @@ GopBlt (
     {
       UINT8  *Dst = (UINT8 *)BltBuffer + DestinationY * SrcDelta + DestinationX * sizeof (UINT32);
 
-      //
-      // Only read from the frame buffer here. Invalidate the source rows first so the copy sees
-      // what the display engine sees, then leave the cache clean rather than dirty.
-      //
       InvalidateDataCacheRange (
         (VOID *)(UINTN)(RUYI_FB_BASE + SourceY * Pitch * sizeof (UINT32)),
         Height * Pitch * sizeof (UINT32)
@@ -231,12 +235,10 @@ GopBlt (
 }
 
 /**
-  One second heartbeat near the top-left corner.
+  Timer callback.
 
-  A 64x64 block alternating between red and white, below the colour bars the earlier geometry
-  probe left behind. While it keeps toggling, the firmware is still executing. When it freezes,
-  control has left UEFI (or interrupts are off), which tells a hung boot manager apart from a
-  kernel that died without printing anything.
+  Turns the third status block green the first time it fires, then keeps a red/white block
+  blinking at row 1000.
 **/
 STATIC
 VOID
@@ -248,9 +250,14 @@ BlinkTick (
 {
   UINT32  *Fb    = FrameBuffer ();
   UINTN   Pitch  = mModeInfo.PixelsPerScanLine;
-  UINT32  Colour = mBlinkOn ? 0x000000FFU : 0x00FFFFFFU;   // red / white
+  UINT32  Colour = mBlinkOn ? RED : 0x00FFFFFFU;
   UINTN   X;
   UINTN   Y;
+
+  //
+  // Status block 3: green once the timer has fired at least once.
+  //
+  PaintStatusBlock (200, GREEN);
 
   mBlinkOn = !mBlinkOn;
 
@@ -266,9 +273,6 @@ BlinkTick (
     );
 }
 
-/**
-  Paint the geometry self test: dark background, one 100x100 square in each corner.
-**/
 STATIC
 VOID
 DrawGeometryTest (
@@ -276,17 +280,12 @@ DrawGeometryTest (
   IN UINT32  Height
   )
 {
-  EFI_GRAPHICS_OUTPUT_BLT_PIXEL  Dark  = { 0x40, 0x20, 0x10, 0x00 };   // B,G,R,X
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL  Dark  = { 0x40, 0x20, 0x10, 0x00 };
   EFI_GRAPHICS_OUTPUT_BLT_PIXEL  White = { 0xFF, 0xFF, 0xFF, 0x00 };
-  EFI_GRAPHICS_OUTPUT_BLT_PIXEL  Red   = { 0x00, 0x00, 0xFF, 0x00 };
-  EFI_GRAPHICS_OUTPUT_BLT_PIXEL  Green = { 0x00, 0xFF, 0x00, 0x00 };
-  EFI_GRAPHICS_OUTPUT_BLT_PIXEL  Blue  = { 0xFF, 0x00, 0x00, 0x00 };
 
   GopBlt (&mGop, &Dark,  EfiBltVideoFill, 0, 0, 0, 0, Width, Height, 0);
   GopBlt (&mGop, &White, EfiBltVideoFill, 0, 0, 0, 0, 100, 100, 0);
-  GopBlt (&mGop, &Red,   EfiBltVideoFill, 0, 0, Width - 100, 0, 100, 100, 0);
-  GopBlt (&mGop, &Green, EfiBltVideoFill, 0, 0, 0, Height - 100, 100, 100, 0);
-  GopBlt (&mGop, &Blue,  EfiBltVideoFill, 0, 0, Width - 100, Height - 100, 100, 100, 0);
+  GopBlt (&mGop, &White, EfiBltVideoFill, 0, 0, Width - 100, Height - 100, 100, 100, 0);
 }
 
 EFI_STATUS
@@ -299,9 +298,10 @@ RuyiGopEntry (
   EFI_STATUS  Status;
   UINT32      Width  = FixedPcdGet32 (PcdFrameBufferWidth);
   UINT32      Height = FixedPcdGet32 (PcdFrameBufferHeight);
+  EFI_STATUS  CreateStatus;
+  EFI_STATUS  TimerStatus;
 
   if ((Width < 640) || (Height < 475)) {
-    DEBUG ((EFI_D_ERROR, "RuyiGopDxe: geometry %ux%u too small\n", Width, Height));
     return EFI_SUCCESS;
   }
 
@@ -325,10 +325,6 @@ RuyiGopEntry (
   mGop.Blt       = GopBlt;
   mGop.Mode      = &mMode;
 
-  //
-  // Geometry proof, painted before the protocol is published so it is visible even if a
-  // consumer later clears the screen.
-  //
   DrawGeometryTest (Width, Height);
 
   Status = gBS->InstallMultipleProtocolInterfaces (
@@ -340,14 +336,27 @@ RuyiGopEntry (
   DEBUG ((EFI_D_ERROR, "RuyiGopDxe: install %ux%u -> %r\n", Width, Height, Status));
 
   //
-  // Heartbeat: 64x64 pixels near the top-left corner, toggling once per second.
+  // Status strip, painted synchronously so it survives a dead timer service:
+  //   block 1 = CreateEvent  (green ok / red failed)
+  //   block 2 = SetTimer     (green ok / red failed)
+  //   block 3 = stays black until BlinkTick fires once
   //
-  if (!EFI_ERROR (gBS->CreateEvent (EVT_TIMER, TPL_CALLBACK, BlinkTick, NULL, &mBlinkEvent))) {
-    gBS->SetTimer (mBlinkEvent, TimerPeriodic, 10000000);
-    DEBUG ((EFI_D_ERROR, "RuyiGopDxe: heartbeat armed\n"));
-  } else {
-    DEBUG ((EFI_D_ERROR, "RuyiGopDxe: heartbeat timer failed\n"));
+  CreateStatus = gBS->CreateEvent (EVT_TIMER, TPL_CALLBACK, BlinkTick, NULL, &mBlinkEvent);
+  TimerStatus  = EFI_NOT_STARTED;
+  if (!EFI_ERROR (CreateStatus)) {
+    TimerStatus = gBS->SetTimer (mBlinkEvent, TimerPeriodic, 10000000);
   }
+
+  PaintStatusBlock (0,   EFI_ERROR (CreateStatus) ? RED : GREEN);
+  PaintStatusBlock (100, EFI_ERROR (TimerStatus)  ? RED : GREEN);
+  PaintStatusBlock (200, BLACK);
+
+  DEBUG ((
+    EFI_D_ERROR,
+    "RuyiGopDxe: CreateEvent %r, SetTimer %r\n",
+    CreateStatus,
+    TimerStatus
+    ));
 
   return EFI_SUCCESS;
 }
