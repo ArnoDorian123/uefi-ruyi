@@ -394,7 +394,13 @@ RuyiGopEntry (
   //
   // Arm the heartbeat and record the outcome of both calls for the status strip.
   //
-  CreateStatus = gBS->CreateEvent (EVT_TIMER, TPL_CALLBACK, BlinkTick, NULL, &mBlinkEvent);
+  CreateStatus = gBS->CreateEvent (
+                  EVT_TIMER | EVT_NOTIFY_SIGNAL,
+                  TPL_CALLBACK,
+                  BlinkTick,
+                  NULL,
+                  &mBlinkEvent
+                  );
   TimerStatus  = EFI_NOT_STARTED;
   if (!EFI_ERROR (CreateStatus)) {
     TimerStatus = gBS->SetTimer (mBlinkEvent, TimerPeriodic, 10000000);
