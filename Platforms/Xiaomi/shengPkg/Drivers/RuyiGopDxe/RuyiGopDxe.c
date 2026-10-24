@@ -2,12 +2,13 @@
   Minimal GOP on the frame buffer the ABL leaves scanning out, plus a status strip that reports
   the timer plumbing without needing a working timer.
 
-  Every Blt ends by repainting three 64x64 blocks on row 100, so the strip lands on top of
-  whatever the boot manager drew and survives full-screen redraws:
+  Every Blt ends by repainting a black band at row 2600 with three 64x64 blocks on it, so the
+  strip lands on top of whatever the boot manager drew and survives full-screen redraws. The row
+  sits far from the colour bars the earlier probes left at the top of the screen.
 
     block 1 (x=0)    CreateEvent  green ok / red failed
-    block 2 (x=100)  SetTimer     green ok / red failed
-    block 3 (x=200)  green once the timer callback has fired at least once
+    block 2 (x=110)  SetTimer     green ok / red failed
+    block 3 (x=220)  white once the timer callback has fired at least once
 
   Frame buffer writes are followed by a cache write-back because the buffer is reserved RAM
   mapped as normal cacheable memory.
@@ -32,6 +33,19 @@
 #define GREEN  0x0000FF00U
 #define BLACK  0x00000000U
 #define WHITE  0x00FFFFFFU
+
+//
+// Row of the status strip. Kept away from the colour bars at the top of the screen.
+//
+#define STRIP_ROW     2600
+#define BLOCK_SIZE    64
+#define BLOCK_STEP    110
+#define STRIP_WIDTH   330
+
+//
+// Row of the moving heartbeat block, only used once the timer works.
+//
+#define BEAT_ROW      1000
 
 #pragma pack(1)
 typedef struct {
@@ -98,7 +112,7 @@ FlushRows (
 }
 
 /**
-  Paint a 64x64 block on row 100 at the given column.
+  Paint a 64x64 block on the status strip row at the given column.
 **/
 STATIC
 VOID
@@ -112,15 +126,18 @@ PaintBlock (
   UINTN   X;
   UINTN   Y;
 
-  for (Y = 0; Y < 64; Y++) {
-    for (X = 0; X < 64; X++) {
-      Fb[(100 + Y) * Pitch + Column + X] = Colour;
+  for (Y = 0; Y < BLOCK_SIZE; Y++) {
+    for (X = 0; X < BLOCK_SIZE; X++) {
+      Fb[(STRIP_ROW + Y) * Pitch + Column + X] = Colour;
     }
   }
 }
 
 /**
   Repaint the status strip on top of the current frame.
+
+  A black backdrop is laid down first so a black block means "painted and not fired" rather than
+  "never drawn", and so the strip reads the same on top of any artwork.
 **/
 STATIC
 VOID
@@ -128,14 +145,26 @@ PaintStatusStrip (
   VOID
   )
 {
+  UINT32  *Fb   = FrameBuffer ();
+  UINTN   Pitch = mModeInfo.PixelsPerScanLine;
+  UINTN   X;
+  UINTN   Y;
+
   if (!mStripReady) {
     return;
   }
 
-  PaintBlock (0,   mStripCreate);
-  PaintBlock (100, mStripTimer);
-  PaintBlock (200, mStripTick);
-  FlushRows (100, 64);
+  for (Y = 0; Y < BLOCK_SIZE; Y++) {
+    for (X = 0; X < STRIP_WIDTH; X++) {
+      Fb[(STRIP_ROW + Y) * Pitch + X] = BLACK;
+    }
+  }
+
+  PaintBlock (0 * BLOCK_STEP, mStripCreate);
+  PaintBlock (1 * BLOCK_STEP, mStripTimer);
+  PaintBlock (2 * BLOCK_STEP, mStripTick);
+
+  FlushRows (STRIP_ROW, BLOCK_SIZE);
 }
 
 STATIC
@@ -283,7 +312,8 @@ GopBlt (
 }
 
 /**
-  Timer callback: marks the third block green and keeps a red/white block blinking at row 1000.
+  Timer callback: turns the third status block white and keeps a red/white block blinking at
+  row 1000.
 **/
 STATIC
 VOID
@@ -299,19 +329,19 @@ BlinkTick (
   UINTN   X;
   UINTN   Y;
 
-  mStripTick = GREEN;
+  mStripTick = WHITE;
 
   mBlinkOn = !mBlinkOn;
 
-  for (Y = 0; Y < 64; Y++) {
-    for (X = 0; X < 64; X++) {
-      Fb[(1000 + Y) * Pitch + X] = Colour;
+  for (Y = 0; Y < BLOCK_SIZE; Y++) {
+    for (X = 0; X < BLOCK_SIZE; X++) {
+      Fb[(BEAT_ROW + Y) * Pitch + X] = Colour;
     }
   }
 
   WriteBackDataCacheRange (
-    (VOID *)(UINTN)(RUYI_FB_BASE + 1000 * Pitch * sizeof (UINT32)),
-    Pitch * 64 * sizeof (UINT32)
+    (VOID *)(UINTN)(RUYI_FB_BASE + BEAT_ROW * Pitch * sizeof (UINT32)),
+    Pitch * BLOCK_SIZE * sizeof (UINT32)
     );
 }
 
