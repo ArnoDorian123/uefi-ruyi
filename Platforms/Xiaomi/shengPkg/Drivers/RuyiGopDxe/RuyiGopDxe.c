@@ -9,7 +9,7 @@
   by a cache write-back for the touched rows. Without it the first render of a screen appears as
   scattered dots and only becomes correct once the cache drains by itself.
 
-  A one second heartbeat in the top-left corner tells a hung boot manager apart from a kernel
+  A one second heartbeat near the top-left corner tells a hung boot manager apart from a kernel
   that died without printing anything.
 
   On load it paints a dark background plus one 100x100 square in each corner and then installs
@@ -231,11 +231,12 @@ GopBlt (
 }
 
 /**
-  One second heartbeat in the top-left corner.
+  One second heartbeat near the top-left corner.
 
-  While this keeps toggling, the firmware is still executing. When it freezes, control has left
-  UEFI (or interrupts are off), which tells a hung boot manager apart from a kernel that died
-  without printing anything.
+  A 64x64 block alternating between red and white, below the colour bars the earlier geometry
+  probe left behind. While it keeps toggling, the firmware is still executing. When it freezes,
+  control has left UEFI (or interrupts are off), which tells a hung boot manager apart from a
+  kernel that died without printing anything.
 **/
 STATIC
 VOID
@@ -247,19 +248,22 @@ BlinkTick (
 {
   UINT32  *Fb    = FrameBuffer ();
   UINTN   Pitch  = mModeInfo.PixelsPerScanLine;
-  UINT32  Colour = mBlinkOn ? 0x0000FFFFU : 0x00000000U;
+  UINT32  Colour = mBlinkOn ? 0x000000FFU : 0x00FFFFFFU;   // red / white
   UINTN   X;
   UINTN   Y;
 
   mBlinkOn = !mBlinkOn;
 
-  for (Y = 0; Y < 24; Y++) {
-    for (X = 0; X < 24; X++) {
-      Fb[Y * Pitch + X] = Colour;
+  for (Y = 0; Y < 64; Y++) {
+    for (X = 0; X < 64; X++) {
+      Fb[(1000 + Y) * Pitch + X] = Colour;
     }
   }
 
-  WriteBackDataCacheRange ((VOID *)(UINTN)RUYI_FB_BASE, Pitch * 24 * sizeof (UINT32));
+  WriteBackDataCacheRange (
+    (VOID *)(UINTN)(RUYI_FB_BASE + 1000 * Pitch * sizeof (UINT32)),
+    Pitch * 64 * sizeof (UINT32)
+    );
 }
 
 /**
@@ -336,7 +340,7 @@ RuyiGopEntry (
   DEBUG ((EFI_D_ERROR, "RuyiGopDxe: install %ux%u -> %r\n", Width, Height, Status));
 
   //
-  // Heartbeat: 24x24 pixels in the top-left corner, toggling once per second.
+  // Heartbeat: 64x64 pixels near the top-left corner, toggling once per second.
   //
   if (!EFI_ERROR (gBS->CreateEvent (EVT_TIMER, TPL_CALLBACK, BlinkTick, NULL, &mBlinkEvent))) {
     gBS->SetTimer (mBlinkEvent, TimerPeriodic, 10000000);
