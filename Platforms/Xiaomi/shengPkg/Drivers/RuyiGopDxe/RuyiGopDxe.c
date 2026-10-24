@@ -1,6 +1,16 @@
 /** @file
   Minimal GOP on the frame buffer the ABL leaves scanning out, plus a status strip that reports
-  whether the timer services work at all.
+  the timer plumbing without needing a working timer.
+
+  Every Blt ends by repainting three 64x64 blocks on row 100, so the strip lands on top of
+  whatever the boot manager drew and survives full-screen redraws:
+
+    block 1 (x=0)    CreateEvent  green ok / red failed
+    block 2 (x=100)  SetTimer     green ok / red failed
+    block 3 (x=200)  green once the timer callback has fired at least once
+
+  Frame buffer writes are followed by a cache write-back because the buffer is reserved RAM
+  mapped as normal cacheable memory.
 
   Copyright (c) 2026, UniXNU contributors. All rights reserved.
   SPDX-License-Identifier: BSD-2-Clause-Patent
@@ -21,6 +31,7 @@
 #define RED    0x000000FFU
 #define GREEN  0x0000FF00U
 #define BLACK  0x00000000U
+#define WHITE  0x00FFFFFFU
 
 #pragma pack(1)
 typedef struct {
@@ -41,8 +52,13 @@ STATIC EFI_GRAPHICS_OUTPUT_MODE_INFORMATION  mModeInfo;
 STATIC EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE    mMode;
 STATIC EFI_GRAPHICS_OUTPUT_PROTOCOL         mGop;
 
-STATIC EFI_EVENT  mBlinkEvent = NULL;
-STATIC BOOLEAN    mBlinkOn    = FALSE;
+STATIC EFI_EVENT  mBlinkEvent  = NULL;
+STATIC BOOLEAN    mBlinkOn     = FALSE;
+
+STATIC BOOLEAN    mStripReady  = FALSE;
+STATIC UINT32     mStripCreate = BLACK;
+STATIC UINT32     mStripTimer  = BLACK;
+STATIC UINT32     mStripTick   = BLACK;
 
 STATIC
 UINT32 *
@@ -53,6 +69,12 @@ FrameBuffer (
   return (UINT32 *)(UINTN)RUYI_FB_BASE;
 }
 
+/**
+  Write back the given rows so the display engine sees them.
+
+  @param[in]  FirstRow  First row that was written.
+  @param[in]  RowCount  Number of rows that were written.
+**/
 STATIC
 VOID
 FlushRows (
@@ -76,11 +98,11 @@ FlushRows (
 }
 
 /**
-  Paint a 64x64 block at the given column, on row 100.
+  Paint a 64x64 block on row 100 at the given column.
 **/
 STATIC
 VOID
-PaintStatusBlock (
+PaintBlock (
   IN UINTN   Column,
   IN UINT32  Colour
   )
@@ -95,7 +117,24 @@ PaintStatusBlock (
       Fb[(100 + Y) * Pitch + Column + X] = Colour;
     }
   }
+}
 
+/**
+  Repaint the status strip on top of the current frame.
+**/
+STATIC
+VOID
+PaintStatusStrip (
+  VOID
+  )
+{
+  if (!mStripReady) {
+    return;
+  }
+
+  PaintBlock (0,   mStripCreate);
+  PaintBlock (100, mStripTimer);
+  PaintBlock (200, mStripTick);
   FlushRows (100, 64);
 }
 
@@ -202,6 +241,10 @@ GopBlt (
     {
       UINT8  *Dst = (UINT8 *)BltBuffer + DestinationY * SrcDelta + DestinationX * sizeof (UINT32);
 
+      //
+      // Only read from the frame buffer here. Invalidate the source rows first so the copy sees
+      // what the display engine sees.
+      //
       InvalidateDataCacheRange (
         (VOID *)(UINTN)(RUYI_FB_BASE + SourceY * Pitch * sizeof (UINT32)),
         Height * Pitch * sizeof (UINT32)
@@ -231,14 +274,16 @@ GopBlt (
       return EFI_UNSUPPORTED;
   }
 
+  //
+  // Land the status strip on top of whatever was just drawn.
+  //
+  PaintStatusStrip ();
+
   return EFI_SUCCESS;
 }
 
 /**
-  Timer callback.
-
-  Turns the third status block green the first time it fires, then keeps a red/white block
-  blinking at row 1000.
+  Timer callback: marks the third block green and keeps a red/white block blinking at row 1000.
 **/
 STATIC
 VOID
@@ -250,14 +295,11 @@ BlinkTick (
 {
   UINT32  *Fb    = FrameBuffer ();
   UINTN   Pitch  = mModeInfo.PixelsPerScanLine;
-  UINT32  Colour = mBlinkOn ? RED : 0x00FFFFFFU;
+  UINT32  Colour = mBlinkOn ? RED : WHITE;
   UINTN   X;
   UINTN   Y;
 
-  //
-  // Status block 3: green once the timer has fired at least once.
-  //
-  PaintStatusBlock (200, GREEN);
+  mStripTick = GREEN;
 
   mBlinkOn = !mBlinkOn;
 
@@ -271,21 +313,6 @@ BlinkTick (
     (VOID *)(UINTN)(RUYI_FB_BASE + 1000 * Pitch * sizeof (UINT32)),
     Pitch * 64 * sizeof (UINT32)
     );
-}
-
-STATIC
-VOID
-DrawGeometryTest (
-  IN UINT32  Width,
-  IN UINT32  Height
-  )
-{
-  EFI_GRAPHICS_OUTPUT_BLT_PIXEL  Dark  = { 0x40, 0x20, 0x10, 0x00 };
-  EFI_GRAPHICS_OUTPUT_BLT_PIXEL  White = { 0xFF, 0xFF, 0xFF, 0x00 };
-
-  GopBlt (&mGop, &Dark,  EfiBltVideoFill, 0, 0, 0, 0, Width, Height, 0);
-  GopBlt (&mGop, &White, EfiBltVideoFill, 0, 0, 0, 0, 100, 100, 0);
-  GopBlt (&mGop, &White, EfiBltVideoFill, 0, 0, Width - 100, Height - 100, 100, 100, 0);
 }
 
 EFI_STATUS
@@ -302,6 +329,7 @@ RuyiGopEntry (
   EFI_STATUS  TimerStatus;
 
   if ((Width < 640) || (Height < 475)) {
+    DEBUG ((EFI_D_ERROR, "RuyiGopDxe: geometry %ux%u too small\n", Width, Height));
     return EFI_SUCCESS;
   }
 
@@ -325,8 +353,6 @@ RuyiGopEntry (
   mGop.Blt       = GopBlt;
   mGop.Mode      = &mMode;
 
-  DrawGeometryTest (Width, Height);
-
   Status = gBS->InstallMultipleProtocolInterfaces (
                   &ImageHandle,
                   &gEfiDevicePathProtocolGuid, &mDevicePath,
@@ -336,10 +362,7 @@ RuyiGopEntry (
   DEBUG ((EFI_D_ERROR, "RuyiGopDxe: install %ux%u -> %r\n", Width, Height, Status));
 
   //
-  // Status strip, painted synchronously so it survives a dead timer service:
-  //   block 1 = CreateEvent  (green ok / red failed)
-  //   block 2 = SetTimer     (green ok / red failed)
-  //   block 3 = stays black until BlinkTick fires once
+  // Arm the heartbeat and record the outcome of both calls for the status strip.
   //
   CreateStatus = gBS->CreateEvent (EVT_TIMER, TPL_CALLBACK, BlinkTick, NULL, &mBlinkEvent);
   TimerStatus  = EFI_NOT_STARTED;
@@ -347,9 +370,9 @@ RuyiGopEntry (
     TimerStatus = gBS->SetTimer (mBlinkEvent, TimerPeriodic, 10000000);
   }
 
-  PaintStatusBlock (0,   EFI_ERROR (CreateStatus) ? RED : GREEN);
-  PaintStatusBlock (100, EFI_ERROR (TimerStatus)  ? RED : GREEN);
-  PaintStatusBlock (200, BLACK);
+  mStripCreate = EFI_ERROR (CreateStatus) ? RED : GREEN;
+  mStripTimer  = EFI_ERROR (TimerStatus)  ? RED : GREEN;
+  mStripReady  = TRUE;
 
   DEBUG ((
     EFI_D_ERROR,
