@@ -22,6 +22,7 @@
 
 [LibraryClasses]
   BaseMemoryLib
+  CacheMaintenanceLib
   DebugLib
   MemoryAllocationLib
   PcdLib
