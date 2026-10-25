@@ -27,11 +27,7 @@
   BUILD_TARGETS                  = RELEASE|DEBUG
   SKUID_IDENTIFIER               = DEFAULT
   FLASH_DEFINITION               = shengPkg/ruyi.fdf
-  USE_CUSTOM_DISPLAY_DRIVER      = 0 #
-  # Advanced Logger exporter: Tools -> Advanced Logger shows the firmware log as QR frames.
-  # Set to 0 if the Mu tree lacks AdvLoggerPkg / QrEncoderLib.
-  #
-  RUYI_ADV_LOG                   = 1
+  USE_CUSTOM_DISPLAY_DRIVER      = 0
 
   #
   # 0 = Mu drivers only. ABL keeps scanning the splash buffer out, so the boot manager is
@@ -46,6 +42,14 @@
   # SM8650 variant selector. 0 = SM8650-AB (ruyi).
   #
   SOC_TYPE                       = 0
+
+  #
+  # 1 = build UniXNU's Advanced Logger exporter, which adds Tools -> Advanced Logger to the
+  #     boot menu and shows the firmware log as a sequence of QR frames. It needs AdvLoggerPkg,
+  #     MsGraphicsPkg, AdvancedLoggerAccessLib and QrEncoderLib in the Mu tree; set it to 0 if
+  #     any of those is missing and the firmware build fails to resolve them.
+  #
+  RUYI_ADV_LOG                   = 1
 
 !include LanaiPkg/LanaiPkg.dsc.inc
 
@@ -94,6 +98,13 @@
   gQcomPkgTokenSpaceGuid.PcdBuildXblHobs|FALSE
 !endif
 
+  #
+  # Advanced Logger export filename prefix (AdvancedLogDxe)
+  #
+!if $(RUYI_ADV_LOG) == 1
+  gUniXNUPkgTokenSpaceGuid.PcdUniXNUDeviceModel|"ruyi"
+!endif
+
 [LibraryClasses]
   #
   # Memory Libraries
@@ -104,6 +115,14 @@
   # QCOM Libraries
   #
   ConfigurationMapLib|shengPkg/Library/ConfigurationMapLib/ConfigurationMapLib.inf
+
+  #
+  # Advanced Logger exporter libraries
+  #
+!if $(RUYI_ADV_LOG) == 1
+  AdvancedLoggerAccessLib|AdvLoggerPkg/Library/AdvancedLoggerAccessLib/AdvancedLoggerAccessLib.inf
+  QrEncoderLib|MsGraphicsPkg/Library/QrEncoderLib/QrEncoderLib.inf
+!endif
 
 [Components]
   #
@@ -118,6 +137,10 @@
   shengPkg/Drivers/RuyiPaintDxe/RuyiPaintDxe.inf
   shengPkg/Drivers/RuyiGopDxe/RuyiGopDxe.inf
   DarwinBootPkg/Driver/DarwinBoot.inf
+
+!if $(RUYI_ADV_LOG) == 1
+  UniXNUPkg/Driver/AdvancedLogDxe/AdvancedLogDxe.inf
+!endif
 
 [LibraryClasses]
   UniXNULib|UniXNUPkg/Library/UniXNULib/UniXNULib.inf
