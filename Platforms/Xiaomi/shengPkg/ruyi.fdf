@@ -66,10 +66,6 @@ READ_LOCK_STATUS   = TRUE
   # IORT DT
   INF QcomPkg/Drivers/IortDtDxe/IortDtDxe.inf
 
-  # Colour-band probe: writes straight into the ABL splash buffer, no GOP, no name lookup.
-  # INF shengPkg/Drivers/RuyiPaintDxe/RuyiPaintDxe.inf
-  INF shengPkg/Drivers/RuyiGopDxe/RuyiGopDxe.inf
-
   # Device Tree
   # The merged ruyi DTB is passed to BootShim by `unixnu bootimg --dtb`, so it is not embedded
   # here. Enable this only if the boot flow has to carry the DTB inside the firmware volume.
@@ -78,6 +74,17 @@ READ_LOCK_STATUS   = TRUE
   #  SECTION RAW = shengPkg/FdtBlob/lanai-qualcomm-ruyi.dtb
   #  SECTION UI = "DeviceTreeBlob"
   #}
+
+  # Display: colour-band probe, then the minimal GOP on the same buffer.
+  INF shengPkg/Drivers/RuyiPaintDxe/RuyiPaintDxe.inf
+  INF shengPkg/Drivers/RuyiGopDxe/RuyiGopDxe.inf
+
+  # Firmware log exporter: adds Tools -> Advanced Logger to the boot menu and shows the
+  # Advanced Logger buffer as a sequence of QR frames. Dispatches on its own Depex, so its
+  # position in the volume does not affect ordering.
+!if $(RUYI_ADV_LOG) == 1
+  INF UniXNUPkg/Driver/AdvancedLogDxe/AdvancedLogDxe.inf
+!endif
 
   !include QcomPkg/Extra.fdf.inc
 
