@@ -27,7 +27,11 @@
   BUILD_TARGETS                  = RELEASE|DEBUG
   SKUID_IDENTIFIER               = DEFAULT
   FLASH_DEFINITION               = shengPkg/ruyi.fdf
-  USE_CUSTOM_DISPLAY_DRIVER      = 0
+  USE_CUSTOM_DISPLAY_DRIVER      = 0 #
+  # Advanced Logger exporter: Tools -> Advanced Logger shows the firmware log as QR frames.
+  # Set to 0 if the Mu tree lacks AdvLoggerPkg / QrEncoderLib.
+  #
+  RUYI_ADV_LOG                   = 1
 
   #
   # 0 = Mu drivers only. ABL keeps scanning the splash buffer out, so the boot manager is
